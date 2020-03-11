@@ -3,15 +3,17 @@ use strum_macros::EnumIter;
 use self::Suit::*;
 use self::Value::*;
 
-use std::fmt;
 use std::cmp::Ordering;
+use std::fmt;
+
+use serde::ser::{Serialize, Serializer};
 
 #[derive(Debug, Clone, Copy, EnumIter, PartialEq, Eq, Hash)]
 pub enum Suit {
     Clubs,
     Diamonds,
     Hearts,
-    Spades
+    Spades,
 }
 
 impl Suit {
@@ -20,7 +22,7 @@ impl Suit {
             Clubs => "Clubs".to_string(),
             Diamonds => "Diamonds".to_string(),
             Hearts => "Hearts".to_string(),
-            Spades => "Spades".to_string()
+            Spades => "Spades".to_string(),
         }
     }
 }
@@ -39,7 +41,7 @@ pub enum Value {
     Ten,
     Jack,
     Queen,
-    King
+    King,
 }
 
 impl Value {
@@ -58,6 +60,24 @@ impl Value {
             Jack => "Jack".to_string(),
             Queen => "Queen".to_string(),
             King => "King".to_string(),
+        }
+    }
+
+    fn short_name(&self) -> String {
+        match *self {
+            Ace => "A".to_string(),
+            Two => "2".to_string(),
+            Three => "3".to_string(),
+            Four => "4".to_string(),
+            Five => "5".to_string(),
+            Six => "6".to_string(),
+            Seven => "7".to_string(),
+            Eight => "8".to_string(),
+            Nine => "9".to_string(),
+            Ten => "10".to_string(),
+            Jack => "J".to_string(),
+            Queen => "Q".to_string(),
+            King => "K".to_string(),
         }
     }
 
@@ -83,12 +103,15 @@ impl Value {
 #[derive(Clone, Copy, Debug, Eq)]
 pub struct Card {
     pub suit: Suit,
-    pub value: Value
+    pub value: Value,
 }
 
 impl Card {
     pub fn new(suit: Suit, value: Value) -> Card {
-        Card { suit: suit, value: value }
+        Card {
+            suit: suit,
+            value: value,
+        }
     }
 }
 
@@ -113,5 +136,19 @@ impl PartialEq for Card {
 impl fmt::Display for Card {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{} of {}", self.value.name(), self.suit.name())
+    }
+}
+
+impl Serialize for Card {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let state = serializer.collect_str(&format!(
+            "{}{}",
+            self.value.short_name(),
+            &self.suit.name()[0..1]
+        ))?;
+        Ok(state)
     }
 }

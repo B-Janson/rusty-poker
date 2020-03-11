@@ -1,13 +1,27 @@
 use crate::card::*;
 
+use self::ResultName::*;
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt;
-use std::cmp::Ordering;
+
+#[derive(Debug, Eq, PartialEq)]
+enum ResultName {
+    StraightFlush,
+    FourOfAKind,
+    FullHouse,
+    Flush,
+    Straight,
+    ThreeOfAKind,
+    TwoPair,
+    Pair,
+    HighCard,
+}
 
 #[derive(Debug, Eq)]
 pub struct HandResult {
-    result: u32,
-    highest: Card
+    result: ResultName,
+    highest: Card,
 }
 
 impl HandResult {
@@ -17,50 +31,50 @@ impl HandResult {
         }
 
         let flush_check = Self::check_flush(hand);
-        if flush_check.result == 8 {
+        if flush_check.result == StraightFlush {
             return flush_check;
         }
 
         let of_a_kind_check = Self::check_of_a_kind(hand);
-        if of_a_kind_check.result == 7 {
+        if of_a_kind_check.result == FourOfAKind {
             return of_a_kind_check;
         }
 
-        if of_a_kind_check.result == 6 {
+        if of_a_kind_check.result == FullHouse {
             return of_a_kind_check;
         }
 
-        if flush_check.result == 5 {
+        if flush_check.result == Flush {
             return flush_check;
         }
 
         let straight_check = Self::check_straight(hand);
-        if straight_check.result == 4 {
+        if straight_check.result == Straight {
             return straight_check;
         }
 
-        if of_a_kind_check.result == 3 {
+        if of_a_kind_check.result == ThreeOfAKind {
             return of_a_kind_check;
         }
 
-        if of_a_kind_check.result == 2 {
+        if of_a_kind_check.result == TwoPair {
             return of_a_kind_check;
         }
 
-        if of_a_kind_check.result == 1 {
+        if of_a_kind_check.result == Pair {
             return of_a_kind_check;
         }
 
         hand.sort_by(|a, b| a.value.value().cmp(&b.value.value()));
 
         return HandResult {
-            result: 0,
-            highest: *hand.last().unwrap()
-        }
+            result: HighCard,
+            highest: *hand.last().unwrap(),
+        };
     }
 
     fn check_flush(hand: &mut [Card]) -> HandResult {
-        let mut result = 0;
+        let mut result = HighCard;
         let mut highest = hand[0];
 
         // Make a hashmap to keep track of the number of cards of the same suit.
@@ -70,24 +84,23 @@ impl HandResult {
         for card in hand.iter() {
             // If this card's suit is already in the map, increment its count and
             // re-insert
-            if let Some(val) = card_map.get(&card.suit) {
-                let val = &(val + 1);
-                card_map.insert(card.suit, *val);
-            } else {
-                card_map.insert(card.suit, 1);
-            }
+            *card_map.entry(card.suit).or_insert(0) += 1;
         }
 
         for (s, n) in card_map.into_iter() {
             if n >= 5 {
-                let mut flush_cards = hand.iter().filter(|&c| c.suit == s).cloned().collect::<Vec<Card>>();
+                let mut flush_cards = hand
+                    .iter()
+                    .filter(|&c| c.suit == s)
+                    .cloned()
+                    .collect::<Vec<Card>>();
 
                 let test = Self::check_straight(&mut flush_cards);
 
-                if test.result == 4 {
-                    result = 8;
+                if test.result == Straight {
+                    result = StraightFlush;
                 } else {
-                    result = 5;
+                    result = Flush;
                 }
 
                 highest = *flush_cards.last().unwrap();
@@ -96,12 +109,12 @@ impl HandResult {
 
         HandResult {
             result: result,
-            highest: highest
+            highest: highest,
         }
     }
 
     fn check_of_a_kind(hand: &mut [Card]) -> HandResult {
-        let mut result = 0;
+        let mut result = HighCard;
         let mut highest = hand[0];
 
         // Make a hashmap to keep track of the number of cards of the same value.
@@ -111,25 +124,21 @@ impl HandResult {
         for card in hand.iter() {
             // If this card's suit is already in the map, increment its count and
             // re-insert
-            if let Some(val) = card_map.get(&card.value) {
-                let mut a = val.clone();
-                a.push(*card);
-                card_map.insert(card.value, a.to_vec());
-            } else {
-                card_map.insert(card.value, vec![*card]);
-            }
+            card_map.entry(card.value).or_insert(vec![]).push(*card);
         }
 
         let mut final_cards = Vec::<Card>::new();
 
         for (v, n) in card_map.into_iter() {
-            // println!("v: {:?} n: {:#?}", v, n);
-
             if n.len() == 4 {
                 return HandResult {
-                    result: 7,
-                    highest: hand.iter().filter(|&c| c.value == v).cloned().collect::<Vec<Card>>()[0]
-                }
+                    result: FourOfAKind,
+                    highest: hand
+                        .iter()
+                        .filter(|&c| c.value == v)
+                        .cloned()
+                        .collect::<Vec<Card>>()[0],
+                };
             }
 
             if n.len() > 1 {
@@ -140,27 +149,27 @@ impl HandResult {
         final_cards.sort_by(|a, b| a.value.value().cmp(&b.value.value()));
 
         if final_cards.len() == 5 || final_cards.len() == 7 {
-            result = 6;
+            result = FullHouse;
             highest = *final_cards.last().unwrap();
         } else if final_cards.len() == 4 || final_cards.len() == 6 {
-            result = 2;
+            result = TwoPair;
             highest = *final_cards.last().unwrap();
         } else if final_cards.len() == 3 {
-            result = 3;
+            result = ThreeOfAKind;
             highest = *final_cards.last().unwrap();
         } else if final_cards.len() == 2 {
-            result = 1;
+            result = Pair;
             highest = *final_cards.last().unwrap();
         }
 
         HandResult {
             result: result,
-            highest: highest
+            highest: highest,
         }
     }
 
     fn check_straight(hand: &mut [Card]) -> HandResult {
-        let mut result = 0;
+        let mut result = HighCard;
 
         hand.sort_by(|a, b| a.value.value().cmp(&b.value.value()));
 
@@ -185,7 +194,7 @@ impl HandResult {
             }
 
             if in_a_row >= 5 {
-                result = 4;
+                result = Straight;
                 highest_card = *card;
             }
 
@@ -194,16 +203,32 @@ impl HandResult {
 
         HandResult {
             result: result,
-            highest: highest_card
+            highest: highest_card,
+        }
+    }
+}
+
+impl ResultName {
+    fn value(&self) -> u32 {
+        match *self {
+            StraightFlush => 8,
+            FourOfAKind => 7,
+            FullHouse => 6,
+            Flush => 5,
+            Straight => 4,
+            ThreeOfAKind => 3,
+            TwoPair => 2,
+            Pair => 1,
+            HighCard => 0,
         }
     }
 }
 
 impl Ord for HandResult {
     fn cmp(&self, other: &Self) -> Ordering {
-        if self.result > other.result {
+        if self.result.value() > other.result.value() {
             Ordering::Greater
-        } else if self.result < other.result {
+        } else if self.result.value() < other.result.value() {
             Ordering::Less
         } else {
             self.highest.cmp(&other.highest)
@@ -226,35 +251,32 @@ impl PartialEq for HandResult {
 impl fmt::Display for HandResult {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.result {
-            8 => {
-                write!(f, "Straight Flush");
-            },
-            7 => {
-                write!(f, "4 Of A Kind");
-            },
-            6 => {
-                write!(f, "Full House");
-            },
-            5 => {
-                write!(f, "Flush");
-            },
-            4 => {
-                write!(f, "Straight");
-            },
-            3 => {
-                write!(f, "3 Of A Kind");
-            },
-            2 => {
-                write!(f, "Two Pair");
-            },
-            1 => {
-                write!(f, "Pair");
-            },
-            0 => {
-                write!(f, "High Card");
-            },
-            _ => {
-                write!(f, "This should not occur");
+            StraightFlush => {
+                write!(f, "Straight Flush")?;
+            }
+            FourOfAKind => {
+                write!(f, "4 Of A Kind")?;
+            }
+            FullHouse => {
+                write!(f, "Full House")?;
+            }
+            Flush => {
+                write!(f, "Flush")?;
+            }
+            Straight => {
+                write!(f, "Straight")?;
+            }
+            ThreeOfAKind => {
+                write!(f, "3 Of A Kind")?;
+            }
+            TwoPair => {
+                write!(f, "Two Pair")?;
+            }
+            Pair => {
+                write!(f, "Pair")?;
+            }
+            HighCard => {
+                write!(f, "High Card")?;
             }
         }
 
@@ -264,216 +286,216 @@ impl fmt::Display for HandResult {
 
 #[test]
 fn test_check_straight_flush() {
-    let mut cards = vec!(
+    let mut cards = vec![
         Card::new(Suit::Hearts, Value::Six),
         Card::new(Suit::Hearts, Value::Two),
         Card::new(Suit::Hearts, Value::Three),
         Card::new(Suit::Hearts, Value::Four),
         Card::new(Suit::Hearts, Value::Five),
         Card::new(Suit::Diamonds, Value::Two),
-        Card::new(Suit::Spades, Value::Two)
-    );
+        Card::new(Suit::Spades, Value::Two),
+    ];
 
     let test_result = HandResult::check_hand(&mut cards);
 
-    assert_eq!(test_result.result, 8);
+    assert_eq!(test_result.result, StraightFlush);
     assert_eq!(test_result.highest, Card::new(Suit::Hearts, Value::Six));
 }
 
 #[test]
 fn test_check_non_straight_flush() {
-    let mut cards = vec!(
+    let mut cards = vec![
         Card::new(Suit::Hearts, Value::Six),
         Card::new(Suit::Hearts, Value::Two),
         Card::new(Suit::Hearts, Value::Ten),
         Card::new(Suit::Hearts, Value::Four),
         Card::new(Suit::Hearts, Value::Five),
         Card::new(Suit::Diamonds, Value::Two),
-        Card::new(Suit::Spades, Value::Two)
-    );
+        Card::new(Suit::Spades, Value::Two),
+    ];
 
     let test_result = HandResult::check_hand(&mut cards);
 
-    assert_eq!(test_result.result, 5);
+    assert_eq!(test_result.result, Flush);
     assert_eq!(test_result.highest, Card::new(Suit::Hearts, Value::Ten));
 }
 
 #[test]
 fn test_check_straight_flush_with_ace_low() {
-    let mut cards = vec!(
+    let mut cards = vec![
         Card::new(Suit::Hearts, Value::Ace),
         Card::new(Suit::Hearts, Value::Two),
         Card::new(Suit::Hearts, Value::Three),
         Card::new(Suit::Hearts, Value::Four),
         Card::new(Suit::Hearts, Value::Five),
         Card::new(Suit::Diamonds, Value::Two),
-        Card::new(Suit::Spades, Value::Two)
-    );
+        Card::new(Suit::Spades, Value::Two),
+    ];
 
     let test_result = HandResult::check_hand(&mut cards);
 
-    assert_eq!(test_result.result, 8);
+    assert_eq!(test_result.result, StraightFlush);
     assert_eq!(test_result.highest, Card::new(Suit::Hearts, Value::Ace));
 }
 
 #[test]
 fn test_check_straight_flush_with_ace_high() {
-    let mut cards = vec!(
+    let mut cards = vec![
         Card::new(Suit::Hearts, Value::Ace),
         Card::new(Suit::Hearts, Value::King),
         Card::new(Suit::Hearts, Value::Queen),
         Card::new(Suit::Hearts, Value::Jack),
         Card::new(Suit::Hearts, Value::Ten),
         Card::new(Suit::Diamonds, Value::Two),
-        Card::new(Suit::Spades, Value::Two)
-    );
+        Card::new(Suit::Spades, Value::Two),
+    ];
 
     let test_result = HandResult::check_hand(&mut cards);
 
-    assert_eq!(test_result.result, 8);
+    assert_eq!(test_result.result, StraightFlush);
     assert_eq!(test_result.highest, Card::new(Suit::Hearts, Value::Ace));
 }
 
 #[test]
 fn test_check_four_of_a_kind() {
-    let mut cards = vec!(
+    let mut cards = vec![
         Card::new(Suit::Hearts, Value::Ace),
         Card::new(Suit::Diamonds, Value::Ace),
         Card::new(Suit::Spades, Value::Ace),
         Card::new(Suit::Clubs, Value::Ace),
         Card::new(Suit::Hearts, Value::Ten),
         Card::new(Suit::Diamonds, Value::Two),
-        Card::new(Suit::Spades, Value::Two)
-    );
+        Card::new(Suit::Spades, Value::Two),
+    ];
 
     let test_result = HandResult::check_hand(&mut cards);
 
-    assert_eq!(test_result.result, 7);
+    assert_eq!(test_result.result, FourOfAKind);
     assert_eq!(test_result.highest, Card::new(Suit::Hearts, Value::Ace));
 }
 
 #[test]
 fn test_check_full_house() {
-    let mut cards = vec!(
+    let mut cards = vec![
         Card::new(Suit::Hearts, Value::Ace),
         Card::new(Suit::Diamonds, Value::Ace),
         Card::new(Suit::Spades, Value::Ace),
         Card::new(Suit::Clubs, Value::Six),
         Card::new(Suit::Hearts, Value::Ten),
         Card::new(Suit::Diamonds, Value::Two),
-        Card::new(Suit::Spades, Value::Two)
-    );
+        Card::new(Suit::Spades, Value::Two),
+    ];
 
     let test_result = HandResult::check_hand(&mut cards);
 
-    assert_eq!(test_result.result, 6);
+    assert_eq!(test_result.result, FullHouse);
     assert_eq!(test_result.highest, Card::new(Suit::Spades, Value::Ace));
 }
 
 #[test]
 fn test_check_flush() {
-    let mut cards = vec!(
+    let mut cards = vec![
         Card::new(Suit::Diamonds, Value::Ten),
         Card::new(Suit::Diamonds, Value::Ace),
         Card::new(Suit::Spades, Value::Three),
         Card::new(Suit::Diamonds, Value::Seven),
         Card::new(Suit::Hearts, Value::Ace),
         Card::new(Suit::Diamonds, Value::King),
-        Card::new(Suit::Diamonds, Value::Queen)
-    );
+        Card::new(Suit::Diamonds, Value::Queen),
+    ];
 
     let test_result = HandResult::check_hand(&mut cards);
 
-    assert_eq!(test_result.result, 5);
+    assert_eq!(test_result.result, Flush);
     assert_eq!(test_result.highest, Card::new(Suit::Diamonds, Value::Ace));
 }
 
 #[test]
 fn test_check_straight() {
-    let mut cards = vec!(
+    let mut cards = vec![
         Card::new(Suit::Hearts, Value::Three),
         Card::new(Suit::Diamonds, Value::Seven),
         Card::new(Suit::Spades, Value::Five),
         Card::new(Suit::Clubs, Value::Seven),
         Card::new(Suit::Hearts, Value::Four),
         Card::new(Suit::Diamonds, Value::King),
-        Card::new(Suit::Spades, Value::Six)
-    );
+        Card::new(Suit::Spades, Value::Six),
+    ];
 
     let test_result = HandResult::check_hand(&mut cards);
 
-    assert_eq!(test_result.result, 4);
+    assert_eq!(test_result.result, Straight);
     assert_eq!(test_result.highest, Card::new(Suit::Diamonds, Value::Seven));
 }
 
 #[test]
 fn test_three_of_a_kind() {
-    let mut cards = vec!(
+    let mut cards = vec![
         Card::new(Suit::Diamonds, Value::Ten),
         Card::new(Suit::Spades, Value::Ace),
         Card::new(Suit::Clubs, Value::Ten),
         Card::new(Suit::Hearts, Value::Seven),
         Card::new(Suit::Diamonds, Value::Four),
         Card::new(Suit::Spades, Value::Ten),
-        Card::new(Suit::Clubs, Value::Queen)
-    );
+        Card::new(Suit::Clubs, Value::Queen),
+    ];
 
     let test_result = HandResult::check_hand(&mut cards);
 
-    assert_eq!(test_result.result, 3);
+    assert_eq!(test_result.result, ThreeOfAKind);
     assert_eq!(test_result.highest, Card::new(Suit::Spades, Value::Ten));
 }
 
 #[test]
 fn test_two_pair() {
-    let mut cards = vec!(
+    let mut cards = vec![
         Card::new(Suit::Diamonds, Value::Ten),
         Card::new(Suit::Spades, Value::Ace),
         Card::new(Suit::Clubs, Value::Ten),
         Card::new(Suit::Hearts, Value::Seven),
         Card::new(Suit::Diamonds, Value::Four),
         Card::new(Suit::Spades, Value::Ace),
-        Card::new(Suit::Clubs, Value::Queen)
-    );
+        Card::new(Suit::Clubs, Value::Queen),
+    ];
 
     let test_result = HandResult::check_hand(&mut cards);
 
-    assert_eq!(test_result.result, 2);
+    assert_eq!(test_result.result, TwoPair);
     assert_eq!(test_result.highest, Card::new(Suit::Spades, Value::Ace));
 }
 
 #[test]
 fn test_pair() {
-    let mut cards = vec!(
+    let mut cards = vec![
         Card::new(Suit::Diamonds, Value::Ten),
         Card::new(Suit::Spades, Value::Ace),
         Card::new(Suit::Clubs, Value::Ten),
         Card::new(Suit::Hearts, Value::Seven),
         Card::new(Suit::Diamonds, Value::Four),
         Card::new(Suit::Spades, Value::Two),
-        Card::new(Suit::Clubs, Value::Queen)
-    );
+        Card::new(Suit::Clubs, Value::Queen),
+    ];
 
     let test_result = HandResult::check_hand(&mut cards);
 
-    assert_eq!(test_result.result, 1);
+    assert_eq!(test_result.result, Pair);
     assert_eq!(test_result.highest, Card::new(Suit::Clubs, Value::Ten));
 }
 
 #[test]
 fn test_high_card() {
-    let mut cards = vec!(
+    let mut cards = vec![
         Card::new(Suit::Diamonds, Value::Five),
         Card::new(Suit::Spades, Value::Ace),
         Card::new(Suit::Clubs, Value::Ten),
         Card::new(Suit::Hearts, Value::Seven),
         Card::new(Suit::Diamonds, Value::Four),
         Card::new(Suit::Spades, Value::Two),
-        Card::new(Suit::Clubs, Value::Queen)
-    );
+        Card::new(Suit::Clubs, Value::Queen),
+    ];
 
     let test_result = HandResult::check_hand(&mut cards);
 
-    assert_eq!(test_result.result, 0);
+    assert_eq!(test_result.result, HighCard);
     assert_eq!(test_result.highest, Card::new(Suit::Spades, Value::Ace));
 }

@@ -4,14 +4,14 @@ use std::fmt;
 
 pub struct Player {
     pub cards: Vec<Card>,
-    name: String
+    name: String,
 }
 
 impl Player {
     pub fn new(name: String) -> Self {
         Player {
             cards: Vec::<Card>::new(),
-            name: name
+            name: name,
         }
     }
 
